@@ -27,6 +27,7 @@
 
     proposed changes:
         - replace single crossover with random crossover for the larger datasets
+        - add random mutations
         - add epochs for the larger datasets
         - increase mutation rate for the larger datasets
         - increase amount of mutations for the larger datasets
@@ -35,7 +36,6 @@
 """
 import numpy as np
 import random
-
 
 
 def gen_population(pizza_types,pop_size=100):
@@ -49,8 +49,13 @@ def gen_population(pizza_types,pop_size=100):
     return pop
      
 def fitness(pop,slice_counts,max_slices):
+    """
+        More pizza slices means a higher fitness.
+        silces over max_slices get a fitness of 0.
+        this is maximization so higher is better.
+    """
     fit = np.sum(pop*slice_counts,axis=1)
-    fit = np.where(fit <= max_slices, fit, 0)
+    fit = np.where(fit <= max_slices, fit, -1)
     return fit
 
 def crossover_single(parents,pop_size):
@@ -65,10 +70,21 @@ def crossover_single(parents,pop_size):
         child = np.append(parents[parent_1,:crossover_point],parents[parent_2,crossover_point:])
         offspring = np.vstack((offspring,child))
     return offspring
-        
 
+def crossover_random(parents,pop_size):
+    """
+        random genes selected from each parent equally
+    """
+    offspring = np.empty((0,parents.shape[1]))
+    crossover_point = int(parents.shape[1]/2)
+    for i in range(pop_size):
+        parent_1,parent_2 = np.random.choice(parents.shape[0],2,replace=False)
+        choice = np.random.randint(2,size=parents.shape[1]).astype(bool)
+        child = np.where(choice,parents[parent_1],parents[parent_2])
+        offspring = np.vstack((offspring,child))
+    return offspring
 
-def mutation(pop,mutation_chance=0.5):
+def mutate_single(pop,mutation_chance=0.5):
     """
         has mutation chance to mutate a single gene
     """
@@ -77,7 +93,17 @@ def mutation(pop,mutation_chance=0.5):
             pop[i,np.random.choice(pop.shape[1])] = np.random.randint(2)
     return pop
 
-def mate(pop,fit,selection=0.4):
+def mutate_random(pop,mutation_chance=0.5):
+    """
+        has mutation chance to mutate 1/2 of the genes randomly
+    """
+    for i in range(pop.shape[0]):
+        if random.random() < mutation_chance:
+            for j in np.random.choice(pop.shape[1],int(pop.shape[1]/2),replace=False):
+                pop[i,j] = np.random.randint(2)
+    return pop
+
+def mate(pop,fit,selection=0.25):
     """
         the top 40% of the population will be mated and create children to fill in the missing 60%
     """
@@ -87,9 +113,11 @@ def mate(pop,fit,selection=0.4):
     best = pop[top]
 
     offspring = crossover_single(best,fit.shape[0]-top_count)
+    # offspring = crossover_random(best,fit.shape[0]-top_count)
     # print('offspring',offspring)
 
-    mutated = mutation(offspring,mutation_chance=1.0)
+    mutated = mutate_single(offspring,mutation_chance=1.0)
+    # mutated = mutate_random(offspring,mutation_chance=1.0)
     # print('mutated:',mutated)
     
     new_pop = np.vstack((best,mutated))
@@ -128,8 +156,8 @@ def run(filename):
     print('max slices:',max_slices)
     print('pizza types:',pizza_types)
     # print('slice counts:',slice_counts)
-
-    print('best solution (first 10 values): {} , score: {}'.format(best[:10],best_fitness))
+    print('score: {}'.format(best_fitness))
+    # print('solution: {}'.format(best[:10]))
 
     # format output
     to_order = str(np.sum(best))
@@ -152,8 +180,8 @@ if __name__ == '__main__':
         uncomment the file you wish to run
     """
     # filename = 'a_example.in'
-    # filename = 'b_small.in'
+    filename = 'b_small.in'
     # filename = 'c_medium.in'
     # filename = 'd_quite_big.in'
-    filename = 'e_also_big.in'
+    # filename = 'e_also_big.in'
     run(filename)
