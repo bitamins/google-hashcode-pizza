@@ -51,7 +51,7 @@ def gen_population(pizza_types,pop_size=100):
 def fitness(pop,slice_counts,max_slices):
     """
         More pizza slices means a higher fitness.
-        silces over max_slices get a fitness of 0.
+        silces over max_slices get a fitness of -1.
         this is maximization so higher is better.
     """
     fit = np.sum(pop*slice_counts,axis=1)
