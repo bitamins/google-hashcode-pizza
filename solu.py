@@ -1,6 +1,6 @@
 """
     This is a NP optimization problem similar to bin packing, knapsack, etc...
-    Requires either linear programming or ML such as genetic algorithm, random hill climbing, simulated annealing, or MIMIC
+    Requires either linear programming or ML randomized optimization such as genetic algorithm, random hill climbing, simulated annealing, or MIMIC
 
     restraints:
         1 of each pizza type AT MOST
@@ -14,6 +14,7 @@
         y = w1x1 + ... + wnxn
         y <= max_slices
         w = 1 | 0
+        x = pizza type
     
     each pizza type will have a weight of 1 or 0 representing if that pizza is included in the order, if y <= max_slices then we have a viable solution.
 
@@ -39,6 +40,9 @@ import random
 
 
 def gen_population(pizza_types,pop_size=100):
+    """
+        Randomly generates a population
+    """
     options = np.array([i for i in range(pizza_types)])
 
     pop = np.random.randint(2,size=pizza_types)
@@ -76,11 +80,20 @@ def crossover_random(parents,pop_size):
         random genes selected from each parent equally
     """
     offspring = np.empty((0,parents.shape[1]))
-    crossover_point = int(parents.shape[1]/2)
     for i in range(pop_size):
         parent_1,parent_2 = np.random.choice(parents.shape[0],2,replace=False)
         choice = np.random.randint(2,size=parents.shape[1]).astype(bool)
         child = np.where(choice,parents[parent_1],parents[parent_2])
+        offspring = np.vstack((offspring,child))
+    return offspring
+
+def crossover_none(parents,pop_size):
+    """
+        clones the parents randomly
+    """
+    offspring = np.empty((0,parents.shape[1]))
+    for i in range(pop_size):
+        child = parents[np.random.choice(parents.shape[0])]
         offspring = np.vstack((offspring,child))
     return offspring
 
@@ -90,7 +103,7 @@ def mutate_single(pop,mutation_chance=0.5):
     """
     for i in range(pop.shape[0]):
         if random.random() < mutation_chance:
-            pop[i,np.random.choice(pop.shape[1])] = np.random.randint(2)
+            pop[i,np.random.choice(pop.shape[1])] = pop[i,np.random.choice(pop.shape[1])]%2
     return pop
 
 def mutate_random(pop,mutation_chance=0.5):
@@ -100,27 +113,33 @@ def mutate_random(pop,mutation_chance=0.5):
     for i in range(pop.shape[0]):
         if random.random() < mutation_chance:
             for j in np.random.choice(pop.shape[1],int(pop.shape[1]/2),replace=False):
-                pop[i,j] = np.random.randint(2)
+                pop[i,j] = pop[i,j]%2
     return pop
 
-def mate(pop,fit,selection=0.25):
+def mate(pop,fit):
+    """        
+        currently: 33% best parents, 33% offspring, 33% new random
     """
-        the top 40% of the population will be mated and create children to fill in the missing 60%
-    """
+    selection=0.33
+
     top_count = int(fit.shape[0]*selection)
     top = np.argsort(fit)[::-1]
     top = top[:top_count]
     best = pop[top]
 
-    offspring = crossover_single(best,fit.shape[0]-top_count)
+    # offspring = crossover_single(best,fit.shape[0]-top_count)
     # offspring = crossover_random(best,fit.shape[0]-top_count)
+    offspring = crossover_none(best,top_count)
     # print('offspring',offspring)
 
     mutated = mutate_single(offspring,mutation_chance=1.0)
-    # mutated = mutate_random(offspring,mutation_chance=1.0)
+    # mutated = mutate_random(offspring,mutation_chance=0.5)
     # print('mutated:',mutated)
+
+    random = gen_population(pop.shape[1],pop.shape[0]-mutated.shape[0]-best.shape[0])
     
-    new_pop = np.vstack((best,mutated))
+    new_pop = np.vstack((best,mutated,random))
+    print(new_pop.shape)
     return new_pop
 
 def select_best(pop,slice_counts,max_slices):
@@ -143,7 +162,7 @@ def run(filename):
     slice_counts = [int(i) for i in slice_counts.split(' ')]
     
     # generate initial population
-    pop = gen_population(pizza_types)
+    pop = gen_population(pizza_types,pop_size=500)
     epochs = 200
 
     # run genetic algorithm
@@ -152,12 +171,15 @@ def run(filename):
         new_pop = mate(pop,fit)
         best,best_fitness = select_best(pop,slice_counts,max_slices)
         print('epoch: {} , best fitness {}'.format(i,best_fitness))
+        if best_fitness == max_slices:
+            print('optimal solution found!')
+            break
 
     print('max slices:',max_slices)
     print('pizza types:',pizza_types)
     # print('slice counts:',slice_counts)
     print('score: {}'.format(best_fitness))
-    # print('solution: {}'.format(best[:10]))
+    print('solution: {}'.format(best[:10]))
 
     # format output
     to_order = str(np.sum(best))
